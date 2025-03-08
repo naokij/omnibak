@@ -1,0 +1,37 @@
+# WebDAV配置
+webdav:
+  remote: "mywebdav"        # rclone中配置的WebDAV远程名称
+  path: "backups"           # 远程备份目录
+  retention_days: 7         # 保留天数
+
+# MySQL备份配置
+mysql:
+  enabled: true            # 是否启用MySQL备份
+  host: "localhost"        # MySQL主机地址
+  port: 3306              # MySQL端口
+  user: "root"            # MySQL用户名
+  password: "secure_password"  # MySQL密码
+  databases:              # 要备份的数据库列表
+    - "all"              # 使用"all"备份所有数据库
+
+# Docker备份配置
+docker:
+  enabled: true           # 是否启用Docker备份
+  containers:            # 要备份的容器列表
+    - "all"             # 使用"all"备份所有容器
+  backup_compose: true   # 是否备份docker-compose文件
+  compose_paths:         # docker-compose文件路径（支持glob模式）
+    - "/opt/apps/*/docker-compose.yml"
+  backup_volumes: true   # 是否备份数据卷
+
+# 文件备份配置
+files:
+  enabled: true          # 是否启用文件备份
+  paths:                # 要备份的文件/目录列表
+    - "/etc/nginx:nginx_config"  # 格式：源路径:备份名称
+    - "/var/www:web_content"
+
+# 日志配置
+logging:
+  level: "info"         # 日志级别：debug, info, warn, error
+  file: "/var/log/omnibak.log"  # 日志文件路径 
