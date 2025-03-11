@@ -27,6 +27,44 @@ OmniBak 是一个用 Go 编写的统一备份解决方案，支持：
 - Docker (如需备份容器)
 - MySQL Client (如需备份数据库)
 
+### 配置 rclone WebDAV
+
+OmniBak 使用 rclone 上传备份文件到 WebDAV 存储。按照以下步骤配置：
+
+1. **安装 rclone**（如果尚未安装）：
+   ```bash
+   # Debian/Ubuntu
+   sudo apt install rclone
+   
+   # CentOS/RHEL
+   sudo yum install rclone
+   
+   # macOS
+   brew install rclone
+   ```
+
+2. **配置 WebDAV 远程存储**：
+   ```bash
+   rclone config
+   ```
+   
+   按照交互提示：
+   - 选择 `n` 创建新的远程存储
+   - 名称：输入 `mywebdav`（与配置文件中 `webdav.remote` 对应）
+   - 类型：选择 `webdav`
+   - URL：输入您的 WebDAV 服务器地址（例如 `https://dav.example.com/remote.php/webdav/`）
+   - 供应商：选择相应的 WebDAV 供应商（如 Nextcloud、Owncloud 等）
+   - 用户名：输入 WebDAV 账户用户名
+   - 密码：输入 WebDAV 账户密码
+   - 高级配置：通常选择默认值
+   - 确认配置：`y`
+
+3. **测试 WebDAV 连接**：
+   ```bash
+   rclone lsd mywebdav:
+   ```
+   如果配置正确，将显示 WebDAV 根目录下的文件夹列表。
+
 ### 安装
 
 #### 方式一：下载预编译的二进制文件（最简单）
