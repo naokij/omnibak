@@ -227,13 +227,14 @@ func main() {
 	}
 
 	// 初始化日志
-	var logWriter = os.Stdout
+	var logWriter io.Writer = os.Stdout
 	if config.Logging.File != "" {
 		logFile, err := os.OpenFile(config.Logging.File, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			log.Printf("无法打开日志文件 %s: %v，将使用标准输出", config.Logging.File, err)
+			log.Printf("无法打开日志文件 %s: %v，将仅使用标准输出", config.Logging.File, err)
 		} else {
-			logWriter = logFile
+			// 使用MultiWriter同时输出到日志文件和标准输出
+			logWriter = io.MultiWriter(os.Stdout, logFile)
 		}
 	}
 	logger = log.New(logWriter, "", log.LstdFlags)
