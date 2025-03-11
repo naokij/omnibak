@@ -29,12 +29,29 @@ OmniBak 是一个用 Go 编写的统一备份解决方案，支持：
 
 ### 安装
 
-#### 方式一：直接安装（推荐）
+#### 方式一：下载预编译的二进制文件（最简单）
+
+您可以从[GitHub Releases](https://github.com/naokij/omnibak/releases)下载最新的预编译二进制文件：
+
+- [Linux (amd64)](https://github.com/naokij/omnibak/releases/latest/download/omnibak-linux-amd64.tar.gz)
+- [Linux (arm64)](https://github.com/naokij/omnibak/releases/latest/download/omnibak-linux-arm64.tar.gz)
+- [macOS (Intel)](https://github.com/naokij/omnibak/releases/latest/download/omnibak-darwin-amd64.tar.gz)
+- [macOS (Apple Silicon)](https://github.com/naokij/omnibak/releases/latest/download/omnibak-darwin-arm64.tar.gz)
+
+下载后解压并移动到系统PATH中：
+```bash
+# 例如 Linux/macOS
+tar -xzvf omnibak-linux-amd64.tar.gz
+sudo mv omnibak-linux-amd64 /usr/local/bin/omnibak
+chmod +x /usr/local/bin/omnibak
+```
+
+#### 方式二：通过Go安装（推荐开发者使用）
 ```bash
 go install github.com/naokij/omnibak@latest
 ```
 
-#### 方式二：从源码编译
+#### 方式三：从源码编译
 ```bash
 # 克隆仓库
 git clone https://github.com/naokij/omnibak.git
@@ -57,6 +74,8 @@ webdav:
 
 mysql:
   enabled: true
+  host: "localhost"
+  port: 3306
   user: "root"
   password: "secure_password"
   databases: ["all"]
@@ -74,6 +93,10 @@ files:
   paths:
     - "/etc/nginx:nginx_config"
     - "/var/www:web_content"
+
+logging:
+  level: "info"
+  file: "/var/log/omnibak.log"
 ```
 
 ### 使用
