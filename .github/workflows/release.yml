@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
 
+# 明确定义所需权限
+permissions:
+  contents: write  # 用于创建releases
+  discussions: write  # 如果您使用GitHub Discussions
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -48,5 +53,6 @@ jobs:
             dist/omnibak-darwin-arm64.tar.gz
             dist/checksums.txt
           generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        # 不需要指定GITHUB_TOKEN，已通过permissions设置授权
+        # env:
+        #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

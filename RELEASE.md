@@ -46,4 +46,26 @@
 5. 勾选"This is a pre-release"选项（如果适用）
 6. 点击"Save draft"保存草稿
 
-当您推送标签时，GitHub Actions会使用这个草稿发布，并添加二进制文件。 
+当您推送标签时，GitHub Actions会使用这个草稿发布，并添加二进制文件。
+
+## 常见问题
+
+### 403权限错误
+如果遇到以下错误：
+```
+Creating new GitHub release for tag vX.Y.Z...
+GitHub release failed with status: 403
+```
+
+请检查以下内容：
+
+1. **仓库设置**：确保GitHub Actions有适当的权限
+   - 前往仓库 → Settings → Actions → General
+   - 在"Workflow permissions"下选择"Read and write permissions"
+   - 勾选"Allow GitHub Actions to create and approve pull requests"
+   - 点击"Save"保存更改
+
+2. **手动创建标签和发布**：如果上述方法不起作用
+   - 删除现有标签：`git tag -d vX.Y.Z` 和 `git push --delete origin vX.Y.Z`
+   - 在GitHub网页界面手动创建Release
+   - 上传构建好的二进制文件 
