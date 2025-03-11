@@ -108,7 +108,7 @@ omnibak -c config.yaml
 omnibak -h
 
 # 定时任务示例（每天2AM）
-0 2 * * * /usr/local/bin/omnibak -c /etc/omnibak/config.yaml >> /var/log/omnibak.log
+0 2 * * * /usr/local/bin/omnibak -c /etc/omnibak/config.yaml
 ```
 
 ## 许可证
