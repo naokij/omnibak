@@ -25,10 +25,12 @@ jobs:
       - name: 构建多平台二进制文件
         run: |
           mkdir -p dist
-          # Linux (amd64)
+          # Linux (amd64 64位)
           GOOS=linux GOARCH=amd64 go build -o dist/omnibak-linux-amd64
-          # Linux (arm64)
+          # Linux (arm64 64位ARM)
           GOOS=linux GOARCH=arm64 go build -o dist/omnibak-linux-arm64
+          # Linux (386 32位x86)
+          GOOS=linux GOARCH=386 go build -o dist/omnibak-linux-386
           # macOS (Intel)
           GOOS=darwin GOARCH=amd64 go build -o dist/omnibak-darwin-amd64
           # macOS (Apple Silicon)
@@ -39,6 +41,7 @@ jobs:
           cd dist
           tar -czvf omnibak-linux-amd64.tar.gz omnibak-linux-amd64
           tar -czvf omnibak-linux-arm64.tar.gz omnibak-linux-arm64
+          tar -czvf omnibak-linux-386.tar.gz omnibak-linux-386
           tar -czvf omnibak-darwin-amd64.tar.gz omnibak-darwin-amd64
           tar -czvf omnibak-darwin-arm64.tar.gz omnibak-darwin-arm64
           sha256sum omnibak-*.tar.gz > checksums.txt
@@ -49,6 +52,7 @@ jobs:
           files: |
             dist/omnibak-linux-amd64.tar.gz
             dist/omnibak-linux-arm64.tar.gz
+            dist/omnibak-linux-386.tar.gz
             dist/omnibak-darwin-amd64.tar.gz
             dist/omnibak-darwin-arm64.tar.gz
             dist/checksums.txt

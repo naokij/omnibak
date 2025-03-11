@@ -35,6 +35,7 @@ OmniBak 是一个用 Go 编写的统一备份解决方案，支持：
 
 - [Linux (amd64)](https://github.com/naokij/omnibak/releases/latest/download/omnibak-linux-amd64.tar.gz)
 - [Linux (arm64)](https://github.com/naokij/omnibak/releases/latest/download/omnibak-linux-arm64.tar.gz)
+- [Linux (x86 32位)](https://github.com/naokij/omnibak/releases/latest/download/omnibak-linux-386.tar.gz)
 - [macOS (Intel)](https://github.com/naokij/omnibak/releases/latest/download/omnibak-darwin-amd64.tar.gz)
 - [macOS (Apple Silicon)](https://github.com/naokij/omnibak/releases/latest/download/omnibak-darwin-arm64.tar.gz)
 
