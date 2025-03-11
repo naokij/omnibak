@@ -34,4 +34,4 @@ files:
 # 日志配置
 logging:
   level: "info"         # 日志级别：debug, info, warn, error
-  file: "/var/log/omnibak.log"  # 日志文件路径 
+  file: "/var/log/omnibak.log"  # 日志文件路径（同时会输出到标准输出） 
