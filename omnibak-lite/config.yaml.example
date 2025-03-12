@@ -1,0 +1,28 @@
+# OmniBakLite 示例配置文件
+
+# MySQL数据库备份配置
+mysql:
+  enabled: true
+  host: localhost
+  port: 3306
+  user: root
+  password: your_password
+
+# 文件备份配置
+files:
+  enabled: true
+  paths:
+    - /var/www/html:web_content  # 格式: 源路径:备份名称
+    - /etc/nginx:nginx_config
+    - /home/user/documents:docs
+
+# WebDAV上传配置
+webdav:
+  enabled: true
+  url: http://your-webdav-server.com/backup
+  user: webdav_user
+  password: webdav_password
+
+# 备份保留策略
+retention:
+  days: 7  # 保留备份的天数，超过此天数的备份将被自动删除 
