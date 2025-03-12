@@ -110,6 +110,7 @@ webdav:
   remote: "mywebdav"
   path: "backups"
   retention_days: 7
+  rclone_config: ""    # 可选: 明确指定rclone配置文件路径
 
 mysql:
   enabled: true
@@ -147,7 +148,47 @@ omnibak -c config.yaml
 omnibak -h
 
 # 定时任务示例（每天2AM）
-0 2 * * * /usr/local/bin/omnibak -c /etc/omnibak/config.yaml
+0 2 * * * /usr/local/bin/omnibak -c /etc/omnibak/config.yaml >> /var/log/omnibak.log 2>&1
+```
+
+### 在Cron环境下使用（v0.1.4新增）
+
+当通过cron计划任务运行omnibak时，可能会遇到rclone无法找到配置文件的问题。这是因为cron运行环境与用户登录环境不同。有两种解决方法：
+
+#### 方法一：在配置文件中指定rclone配置路径（推荐）
+
+```yaml
+webdav:
+  remote: "mywebdav"
+  path: "backups"
+  retention_days: 7
+  rclone_config: "/home/用户名/.config/rclone/rclone.conf"  # 添加此行，使用绝对路径
+```
+
+#### 方法二：在crontab中设置HOME环境变量
+
+```
+# 在crontab中添加
+HOME=/home/用户名
+0 2 * * * /usr/local/bin/omnibak -c /etc/omnibak/config.yaml >> /var/log/omnibak.log 2>&1
+```
+
+#### 诊断和故障排除
+
+从v0.1.4版本开始，omnibak包含自动环境诊断功能，会在启动时记录系统信息、环境变量和rclone配置状态。诊断信息会记录到日志中，便于排查问题。
+
+您还可以使用包含的测试脚本来模拟cron环境：
+
+```bash
+# 下载测试脚本
+wget https://raw.githubusercontent.com/naokij/omnibak/main/test-cron.sh
+chmod +x test-cron.sh
+
+# 编辑脚本中的配置文件路径
+nano test-cron.sh
+
+# 运行测试
+./test-cron.sh
 ```
 
 ## 许可证
