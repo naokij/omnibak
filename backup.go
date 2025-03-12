@@ -20,6 +20,7 @@ type Config struct {
 		Remote        string `yaml:"remote"`
 		Path          string `yaml:"path"`
 		RetentionDays int    `yaml:"retention_days"`
+		RcloneConfig  string `yaml:"rclone_config"`
 	} `yaml:"webdav"`
 
 	MySQL struct {
@@ -238,6 +239,9 @@ func main() {
 		}
 	}
 	logger = log.New(logWriter, "", log.LstdFlags)
+
+	// 收集环境信息 (调试模式)
+	debugEnvironment()
 
 	// 检查依赖
 	if err := checkDependencies(); err != nil {
@@ -482,11 +486,26 @@ func uploadToWebDAV() {
 	logger.Println("开始上传到 WebDAV...")
 	remotePath := fmt.Sprintf("%s:%s/%s", config.WebDAV.Remote, config.WebDAV.Path, dateStr)
 
-	if err := runCommand("rclone", []string{"mkdir", remotePath}, ""); err != nil {
+	// 构建mkdir命令参数
+	args := []string{"mkdir", remotePath}
+	// 添加配置文件路径参数
+	if config.WebDAV.RcloneConfig != "" {
+		args = []string{"--config", config.WebDAV.RcloneConfig, "mkdir", remotePath}
+		logger.Printf("使用自定义rclone配置: %s", config.WebDAV.RcloneConfig)
+	}
+
+	if err := runCommand("rclone", args, ""); err != nil {
 		logger.Fatalf("无法创建 WebDAV 目录: %v", err)
 	}
 
-	if err := runCommand("rclone", []string{"copy", tempDir, remotePath, "--progress"}, ""); err != nil {
+	// 构建copy命令参数
+	copyArgs := []string{"copy", tempDir, remotePath, "--progress"}
+	// 添加配置文件路径参数
+	if config.WebDAV.RcloneConfig != "" {
+		copyArgs = []string{"--config", config.WebDAV.RcloneConfig, "copy", tempDir, remotePath, "--progress"}
+	}
+
+	if err := runCommand("rclone", copyArgs, ""); err != nil {
 		logger.Fatalf("上传到 WebDAV 失败: %v", err)
 	}
 
@@ -498,7 +517,15 @@ func cleanupOldBackups() {
 	cutoffDate := time.Now().AddDate(0, 0, -config.WebDAV.RetentionDays).Format("20060102")
 
 	remotePath := fmt.Sprintf("%s:%s", config.WebDAV.Remote, config.WebDAV.Path)
-	out, err := exec.Command("rclone", "lsd", remotePath).Output()
+
+	// 构建lsd命令参数
+	lsdArgs := []string{"lsd", remotePath}
+	// 添加配置文件路径参数
+	if config.WebDAV.RcloneConfig != "" {
+		lsdArgs = []string{"--config", config.WebDAV.RcloneConfig, "lsd", remotePath}
+	}
+
+	out, err := exec.Command("rclone", lsdArgs...).Output()
 	if err != nil {
 		logger.Printf("无法获取 WebDAV 备份列表: %v", err)
 		return
@@ -520,7 +547,15 @@ func cleanupOldBackups() {
 		if folderDate < cutoffDate {
 			logger.Printf("删除旧备份: %s", folder)
 			remoteFolder := fmt.Sprintf("%s/%s", remotePath, folder)
-			if err := runCommand("rclone", []string{"purge", remoteFolder}, ""); err != nil {
+
+			// 构建purge命令参数
+			purgeArgs := []string{"purge", remoteFolder}
+			// 添加配置文件路径参数
+			if config.WebDAV.RcloneConfig != "" {
+				purgeArgs = []string{"--config", config.WebDAV.RcloneConfig, "purge", remoteFolder}
+			}
+
+			if err := runCommand("rclone", purgeArgs, ""); err != nil {
 				logger.Printf("删除备份 %s 失败: %v", folder, err)
 			}
 		}
@@ -564,14 +599,23 @@ func runCommand(name string, args []string, outputFile string) error {
 
 	cmd := exec.Command(name, args...)
 
+	// 设置明确的工作目录
+	cmd.Dir = os.TempDir()
+
+	// 记录当前环境变量
+	logger.Printf("环境HOME=%s", os.Getenv("HOME"))
+
 	// 处理输出重定向
+	var stdout bytes.Buffer
 	if outputFile != "" {
 		file, err := os.Create(outputFile)
 		if err != nil {
 			return fmt.Errorf("创建输出文件失败: %w", err)
 		}
 		defer file.Close()
-		cmd.Stdout = file
+		cmd.Stdout = io.MultiWriter(file, &stdout) // 同时捕获到文件和内存
+	} else {
+		cmd.Stdout = &stdout
 	}
 
 	// 捕获标准错误
@@ -579,13 +623,31 @@ func runCommand(name string, args []string, outputFile string) error {
 	cmd.Stderr = &stderr
 
 	// 执行命令
-	if err := cmd.Run(); err != nil {
-		errorMsg := stderr.String()
-		if errorMsg == "" {
-			errorMsg = err.Error()
-		}
-		return fmt.Errorf("命令执行失败: %s %v → %s", name, sanitizedArgs, errorMsg)
+	startTime := time.Now()
+	err := cmd.Run()
+	duration := time.Since(startTime)
+
+	// 记录执行时间
+	logger.Printf("命令执行时间: %v", duration)
+
+	// 记录所有输出
+	stdoutStr := stdout.String()
+	stderrStr := stderr.String()
+
+	if stdoutStr != "" && len(stdoutStr) < 1000 {
+		logger.Printf("命令标准输出: %s", stdoutStr)
+	} else if stdoutStr != "" {
+		logger.Printf("命令标准输出: [输出过长，已省略]")
 	}
+
+	if err != nil {
+		if stderrStr != "" {
+			logger.Printf("命令错误输出: %s", stderrStr)
+			return fmt.Errorf("命令执行失败: %s %v → %s", name, sanitizedArgs, stderrStr)
+		}
+		return fmt.Errorf("命令执行失败: %s %v → %s", name, sanitizedArgs, err.Error())
+	}
+
 	return nil
 }
 

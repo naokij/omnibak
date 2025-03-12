@@ -3,6 +3,7 @@ webdav:
   remote: "mywebdav"        # rclone中配置的WebDAV远程名称
   path: "backups"           # 远程备份目录
   retention_days: 7         # 保留天数
+  rclone_config: ""         # 可选: 指定rclone配置文件路径，解决cron环境问题
 
 # MySQL备份配置
 mysql:
