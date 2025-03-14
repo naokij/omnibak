@@ -159,6 +159,40 @@ func checkDependencies() error {
 	return nil
 }
 
+// 暂停需要备份的容器
+func pauseContainers() []string {
+	logger.Println("暂停容器以确保数据一致性...")
+
+	var containersToResume []string
+	containers := getDockerContainers()
+
+	for _, container := range containers {
+		logger.Printf("暂停容器: %s", container)
+		if err := runCommand("docker", []string{"pause", container}, ""); err != nil {
+			logger.Printf("无法暂停容器 %s: %v", container, err)
+			continue
+		}
+		containersToResume = append(containersToResume, container)
+	}
+
+	logger.Printf("成功暂停 %d 个容器", len(containersToResume))
+	return containersToResume
+}
+
+// 恢复暂停的容器
+func resumeContainers(containers []string) {
+	logger.Println("恢复暂停的容器...")
+
+	for _, container := range containers {
+		logger.Printf("恢复容器: %s", container)
+		if err := runCommand("docker", []string{"unpause", container}, ""); err != nil {
+			logger.Printf("无法恢复容器 %s: %v", container, err)
+		}
+	}
+
+	logger.Println("所有容器已恢复运行")
+}
+
 func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [options]\n", os.Args[0])
@@ -255,10 +289,31 @@ func main() {
 		logger.Fatalf("无法创建临时目录: %v", err)
 	}
 
-	// 执行备份
+	// 如果启用了Docker备份，先暂停容器
+	containersToResume := []string{}
+	if config.Docker.Enabled {
+		containersToResume = pauseContainers()
+	}
+
+	// 使用defer确保即使发生错误，容器也能被恢复
+	defer func() {
+		// 恢复暂停的容器
+		if len(containersToResume) > 0 {
+			resumeContainers(containersToResume)
+		}
+	}()
+
+	// 执行本地备份
 	backupMySQL()
 	backupDocker()
 	backupFiles()
+
+	// 手动恢复容器，这样在本地备份完成后立即恢复，而不是等到整个备份过程结束
+	if len(containersToResume) > 0 {
+		resumeContainers(containersToResume)
+		// 清空列表，防止defer中重复恢复
+		containersToResume = nil
+	}
 
 	// 上传到 WebDAV
 	uploadToWebDAV()
