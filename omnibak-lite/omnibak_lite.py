@@ -8,6 +8,10 @@ import time
 import logging
 from optparse import OptionParser
 
+# 设置默认编码为utf-8
+reload(sys)
+sys.setdefaultencoding('utf-8')
+
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -107,8 +111,9 @@ class OmniBakLite:
         retcode = subprocess.call(test_cmd, shell=True)
         if retcode != 0:
             logger.error("无法连接到WebDAV服务器，请检查配置")
-            return
+            return False
 
+        upload_success = True
         for root, _, files in os.walk(self.backup_dir):
             for file in files:
                 file_path = os.path.join(root, file)
@@ -124,9 +129,29 @@ class OmniBakLite:
                     logger.info("上传成功: %s" % file)
                 except Exception, e:
                     logger.error(str(e))
+                    upload_success = False
+        
+        return upload_success
     
-    def cleanup_old_backups(self):
-        """清理旧备份文件"""
+    def cleanup_temp_files(self):
+        """清理临时备份文件"""
+        logger.info("开始清理临时备份文件...")
+        
+        if os.path.exists(self.backup_dir):
+            for root, _, files in os.walk(self.backup_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    try:
+                        os.remove(file_path)
+                        logger.info("已删除临时备份文件: %s" % file_path)
+                    except Exception, e:
+                        logger.error("删除临时文件失败: %s, 错误: %s" % (file_path, str(e)))
+    
+    def cleanup_old_webdav_backups(self):
+        """清理WebDAV上的旧备份文件"""
+        if not self.config.get('webdav', {}).get('enabled', False):
+            return
+            
         # 获取保留天数，默认为7天
         retention_days = self.config.get('retention', {}).get('days', 7)
         # 确保retention_days是整数
@@ -136,23 +161,69 @@ class OmniBakLite:
             logger.warning("保留天数配置无效，使用默认值7天")
             retention_days = 7
             
-        logger.info("开始清理超过 %d 天的旧备份..." % retention_days)
+        logger.info("开始清理WebDAV上超过 %d 天的旧备份..." % retention_days)
         
-        # 计算截止时间
-        cutoff_time = time.time() - (retention_days * 86400)  # 86400秒 = 1天
+        # 计算截止时间（YYYYMMDD格式）
+        cutoff_date = time.strftime("%Y%m%d", time.localtime(time.time() - (retention_days * 86400)))
         
-        # 清理本地备份
-        if os.path.exists(self.backup_dir):
-            for root, _, files in os.walk(self.backup_dir):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    file_mtime = os.path.getmtime(file_path)
-                    if file_mtime < cutoff_time:
-                        try:
-                            os.remove(file_path)
-                            logger.info("已删除旧备份文件: %s" % file_path)
-                        except Exception, e:
-                            logger.error("删除文件失败: %s, 错误: %s" % (file_path, str(e)))
+        # 获取WebDAV上的文件列表
+        list_cmd = 'curl -u %s:%s -X PROPFIND %s' % (
+            self.config['webdav']['user'],
+            self.config['webdav']['password'],
+            self.config['webdav']['url']
+        )
+        
+        # 使用临时文件存储PROPFIND结果
+        temp_file = os.path.join(self.backup_dir, "webdav_list.xml")
+        
+        try:
+            os.system("%s > %s" % (list_cmd, temp_file))
+            
+            # 解析XML获取文件列表
+            import xml.etree.ElementTree as ET
+            if os.path.exists(temp_file):
+                tree = ET.parse(temp_file)
+                root = tree.getroot()
+                
+                # 查找所有文件名
+                for href in root.findall(".//{DAV:}href"):
+                    file_url = href.text
+                    if file_url:
+                        # 提取文件名
+                        file_name = os.path.basename(file_url.rstrip('/'))
+                        
+                        # 检查文件名是否包含日期戳
+                        if '_' in file_name:
+                            try:
+                                # 尝试提取日期部分（假设格式为name_YYYYMMDDHHMMSS.ext）
+                                date_part = file_name.split('_')[1].split('.')[0][:8]  # 提取YYYYMMDD部分
+                                
+                                # 如果日期早于截止日期，则删除文件
+                                if date_part < cutoff_date:
+                                    delete_cmd = 'curl -u %s:%s -X DELETE %s/%s' % (
+                                        self.config['webdav']['user'],
+                                        self.config['webdav']['password'],
+                                        self.config['webdav']['url'],
+                                        file_name
+                                    )
+                                    retcode = subprocess.call(delete_cmd, shell=True)
+                                    if retcode == 0:
+                                        logger.info("已删除WebDAV上的旧备份文件: %s" % file_name)
+                                    else:
+                                        logger.error("删除WebDAV文件失败: %s, 返回码: %d" % (file_name, retcode))
+                            except (IndexError, ValueError):
+                                # 如果无法解析日期，则跳过
+                                logger.warning("无法解析文件名中的日期: %s" % file_name)
+        except Exception, e:
+            logger.error("清理WebDAV文件时发生错误: %s" % str(e))
+        finally:
+            # 确保在所有情况下都删除临时文件
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                    logger.debug("已删除临时文件: %s" % temp_file)
+                except Exception, e:
+                    logger.error("删除临时文件失败: %s, 错误: %s" % (temp_file, str(e)))
 
 def parse_config(config_file):
     """解析配置文件"""
@@ -287,8 +358,21 @@ def main():
     bak = OmniBakLite(config)
     bak.backup_mysql()
     bak.backup_files()
-    bak.upload_to_webdav()
-    bak.cleanup_old_backups()  # 清理旧备份
+    
+    # 上传到WebDAV，并根据上传结果决定是否清理
+    upload_success = bak.upload_to_webdav()
+    
+    # 如果上传成功，清理临时文件和WebDAV上的旧文件
+    if upload_success:
+        logger.info("上传成功，开始清理...")
+        bak.cleanup_temp_files()  # 清理临时文件
+        bak.cleanup_old_webdav_backups()  # 根据保留策略清理WebDAV上的旧文件
+        logger.info("===== 备份任务完成 =====")
+        logger.info("备份已成功上传到WebDAV，临时文件已清理，旧备份已根据保留策略清理")
+    else:
+        logger.warning("上传失败，跳过清理步骤")
+        logger.warning("===== 备份任务部分完成 =====")
+        logger.warning("备份已创建但上传失败，临时文件已保留，请检查WebDAV配置后手动处理")
 
 if __name__ == "__main__":
     main() 
