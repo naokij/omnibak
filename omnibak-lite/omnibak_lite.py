@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+# python版本2.4.3
 import os
 import sys
 import subprocess
@@ -66,7 +66,8 @@ class OmniBakLite:
             if retcode != 0:
                 raise Exception("MySQL备份失败，返回码: %d" % retcode)
             logger.info("MySQL备份成功: %s" % backup_file)
-        except Exception, e:
+        except Exception:
+            e = sys.exc_info()[1]
             logger.error(str(e))
 
     def backup_files(self):
@@ -93,7 +94,8 @@ class OmniBakLite:
                 if retcode != 0:
                     raise Exception("文件备份失败，返回码: %d" % retcode)
                 logger.info("文件备份成功: %s" % backup_file)
-            except Exception, e:
+            except Exception:
+                e = sys.exc_info()[1]
                 logger.error(str(e))
 
     def upload_to_webdav(self):
@@ -127,7 +129,8 @@ class OmniBakLite:
                     if retcode != 0:
                         raise Exception("上传失败，返回码: %d" % retcode)
                     logger.info("上传成功: %s" % file)
-                except Exception, e:
+                except Exception:
+                    e = sys.exc_info()[1]
                     logger.error(str(e))
                     upload_success = False
         
@@ -144,7 +147,8 @@ class OmniBakLite:
                     try:
                         os.remove(file_path)
                         logger.info("已删除临时备份文件: %s" % file_path)
-                    except Exception, e:
+                    except Exception:
+                        e = sys.exc_info()[1]
                         logger.error("删除临时文件失败: %s, 错误: %s" % (file_path, str(e)))
     
     def cleanup_old_webdav_backups(self):
@@ -176,53 +180,59 @@ class OmniBakLite:
         # 使用临时文件存储PROPFIND结果
         temp_file = os.path.join(self.backup_dir, "webdav_list.xml")
         
+        # 分离try和finally块
+        err = None
         try:
-            os.system("%s > %s" % (list_cmd, temp_file))
-            
-            # 解析XML获取文件列表
-            import xml.etree.ElementTree as ET
-            if os.path.exists(temp_file):
-                tree = ET.parse(temp_file)
-                root = tree.getroot()
+            try:
+                os.system("%s > %s" % (list_cmd, temp_file))
                 
-                # 查找所有文件名
-                for href in root.findall(".//{DAV:}href"):
-                    file_url = href.text
-                    if file_url:
-                        # 提取文件名
-                        file_name = os.path.basename(file_url.rstrip('/'))
-                        
-                        # 检查文件名是否包含日期戳
-                        if '_' in file_name:
-                            try:
-                                # 尝试提取日期部分（假设格式为name_YYYYMMDDHHMMSS.ext）
-                                date_part = file_name.split('_')[1].split('.')[0][:8]  # 提取YYYYMMDD部分
-                                
-                                # 如果日期早于截止日期，则删除文件
-                                if date_part < cutoff_date:
-                                    delete_cmd = 'curl -u %s:%s -X DELETE %s/%s' % (
-                                        self.config['webdav']['user'],
-                                        self.config['webdav']['password'],
-                                        self.config['webdav']['url'],
-                                        file_name
-                                    )
-                                    retcode = subprocess.call(delete_cmd, shell=True)
-                                    if retcode == 0:
-                                        logger.info("已删除WebDAV上的旧备份文件: %s" % file_name)
-                                    else:
-                                        logger.error("删除WebDAV文件失败: %s, 返回码: %d" % (file_name, retcode))
-                            except (IndexError, ValueError):
-                                # 如果无法解析日期，则跳过
-                                logger.warning("无法解析文件名中的日期: %s" % file_name)
-        except Exception, e:
-            logger.error("清理WebDAV文件时发生错误: %s" % str(e))
+                # 解析XML获取文件列表
+                import xml.etree.ElementTree as ET
+                if os.path.exists(temp_file):
+                    tree = ET.parse(temp_file)
+                    root = tree.getroot()
+                    
+                    # 查找所有文件名
+                    for href in root.findall(".//{DAV:}href"):
+                        file_url = href.text
+                        if file_url:
+                            # 提取文件名
+                            file_name = os.path.basename(file_url.rstrip('/'))
+                            
+                            # 检查文件名是否包含日期戳
+                            if '_' in file_name:
+                                try:
+                                    # 尝试提取日期部分（假设格式为name_YYYYMMDDHHMMSS.ext）
+                                    date_part = file_name.split('_')[1].split('.')[0][:8]  # 提取YYYYMMDD部分
+                                    
+                                    # 如果日期早于截止日期，则删除文件
+                                    if date_part < cutoff_date:
+                                        delete_cmd = 'curl -u %s:%s -X DELETE %s/%s' % (
+                                            self.config['webdav']['user'],
+                                            self.config['webdav']['password'],
+                                            self.config['webdav']['url'],
+                                            file_name
+                                        )
+                                        retcode = subprocess.call(delete_cmd, shell=True)
+                                        if retcode == 0:
+                                            logger.info("已删除WebDAV上的旧备份文件: %s" % file_name)
+                                        else:
+                                            logger.error("删除WebDAV文件失败: %s, 返回码: %d" % (file_name, retcode))
+                                except (IndexError, ValueError):
+                                    # 如果无法解析日期，则跳过
+                                    logger.warning("无法解析文件名中的日期: %s" % file_name)
+            except Exception:
+                e = sys.exc_info()[1]
+                err = e
+                logger.error("清理WebDAV文件时发生错误: %s" % str(e))
         finally:
             # 确保在所有情况下都删除临时文件
             if os.path.exists(temp_file):
                 try:
                     os.remove(temp_file)
                     logger.debug("已删除临时文件: %s" % temp_file)
-                except Exception, e:
+                except Exception:
+                    e = sys.exc_info()[1]
                     logger.error("删除临时文件失败: %s, 错误: %s" % (temp_file, str(e)))
 
 def parse_config(config_file):
@@ -234,9 +244,10 @@ def parse_config(config_file):
         'retention': {'days': 7}  # 默认保留7天
     }
     
+    f = None
     try:
-        f = open(config_file, 'r')
         try:
+            f = open(config_file, 'r')
             current_section = None
             current_subsection = None
             for line in f:
@@ -309,14 +320,20 @@ def parse_config(config_file):
                             config[current_section]['paths'].append("%s:%s" % (src.strip(), dest.strip()))
                         else:
                             config[current_section]['paths'].append(list_item)
-        finally:
-            f.close()
-    except IOError, e:
-        logger.error("无法读取配置文件: %s" % str(e))
-        sys.exit(1)
-    except Exception, e:
-        logger.error("解析配置文件时发生错误: %s" % str(e))
-        sys.exit(1)
+        except IOError:
+            e = sys.exc_info()[1]
+            logger.error("无法读取配置文件: %s" % str(e))
+            sys.exit(1)
+        except Exception:
+            e = sys.exc_info()[1]
+            logger.error("解析配置文件时发生错误: %s" % str(e))
+            sys.exit(1)
+    finally:
+        if f:
+            try:
+                f.close()
+            except:
+                pass
     
     # 确保retention.days是整数
     if 'retention' in config and 'days' in config['retention']:
