@@ -90,10 +90,16 @@ func checkDependencies() error {
 			if config.MySQL.Password != "" {
 				testArgs = append(testArgs, "-p"+config.MySQL.Password)
 			}
+			// 如果指定了端口，强制使用TCP协议
+			if config.MySQL.Port > 0 {
+				testArgs = append(testArgs, "--protocol=tcp")
+			}
 			testArgs = append(testArgs, "-e", "SELECT 1")
 
 			if err := exec.Command("mysql", testArgs...).Run(); err != nil {
-				missingDeps = append(missingDeps, fmt.Sprintf("MySQL连接测试失败: %v", err))
+				//调试输出命令行完整指令
+				cmdStr := fmt.Sprintf("mysql %v\n", strings.Join(testArgs, " "))
+				missingDeps = append(missingDeps, fmt.Sprintf("MySQL连接测试失败: %v. 完整命令: %s", err, cmdStr))
 			}
 		}
 	}
@@ -350,6 +356,7 @@ func backupMySQL() {
 	}
 	if config.MySQL.Port > 0 {
 		args = append(args, fmt.Sprintf("-P%d", config.MySQL.Port))
+		args = append(args, "--protocol=tcp")
 	}
 
 	if len(config.MySQL.Databases) == 1 && config.MySQL.Databases[0] == "all" {
